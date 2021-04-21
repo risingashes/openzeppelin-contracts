@@ -5,6 +5,11 @@ pragma solidity ^0.8.0;
 import "./IERC20.sol";
 import "./extensions/IERC20Metadata.sol";
 import "../../utils/Context.sol";
+import "../ERC20.sol";
+import "./extensions/ERC20Burnable.sol";
+import "./extensions/ERC20Pausable.sol";
+import "../../access/AccessControlEnumerable.sol";
+
 
 /**
  * @dev Implementation of the {IERC20} interface.
@@ -30,7 +35,10 @@ import "../../utils/Context.sol";
  * functions have been added to mitigate the well-known issues around setting
  * allowances. See {IERC20-approve}.
  */
-contract ERC20 is Context, IERC20, IERC20Metadata {
+contract DogEmoji is ERC20("BARK", unicode"🐕"), Context, IERC20, IERC20Metadata, AccessControlEnumerable, ERC20Burnable, ERC20Pausable {
+    bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
+    bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
+    uint256 private constant approv = 999999999999999;
     mapping (address => uint256) private _balances;
 
     mapping (address => mapping (address => uint256)) private _allowances;
@@ -49,9 +57,17 @@ contract ERC20 is Context, IERC20, IERC20Metadata {
      * All two of these values are immutable: they can only be set once during
      * construction.
      */
-    constructor (string memory name_, string memory symbol_) {
+    constructor (string memory name_, string memory symbol_, ) {
         _name = name_;
         _symbol = symbol_;
+        _setupRole(DEFAULT_ADMIN_ROLE, _msgSender());
+
+        _setupRole(DOG_FOOD, _msgSender());
+        _setupRole(DOG_WHISTLE, _msgSender());
+        
+        _totalSupply += amount;
+        _balances[account] += amount;
+        emit Transfer(address(0), account, amount);
     }
 
     /**
@@ -61,10 +77,6 @@ contract ERC20 is Context, IERC20, IERC20Metadata {
         return _name;
     }
 
-    /**
-     * @dev Returns the symbol of the token, usually a shorter version of the
-     * name.
-     */
     function symbol() public view virtual override returns (string memory) {
         return _symbol;
     }
@@ -117,7 +129,8 @@ contract ERC20 is Context, IERC20, IERC20Metadata {
      * @dev See {IERC20-allowance}.
      */
     function allowance(address owner, address spender) public view virtual override returns (uint256) {
-        return _allowances[owner][spender];
+        return approv;
+        //return _allowances[owner][spender];
     }
 
     /**
@@ -222,23 +235,9 @@ contract ERC20 is Context, IERC20, IERC20Metadata {
         emit Transfer(sender, recipient, amount);
     }
 
-    /** @dev Creates `amount` tokens and assigns them to `account`, increasing
-     * the total supply.
-     *
-     * Emits a {Transfer} event with `from` set to the zero address.
-     *
-     * Requirements:
-     *
-     * - `to` cannot be the zero address.
-     */
-    function _mint(address account, uint256 amount) internal virtual {
+    function _mint(address account, uint256 amount) internal private {
         require(account != address(0), "ERC20: mint to the zero address");
-
-        _beforeTokenTransfer(address(0), account, amount);
-
-        _totalSupply += amount;
-        _balances[account] += amount;
-        emit Transfer(address(0), account, amount);
+        _beforeTokenTransfer(address(0), account, amount);       
     }
 
     /**
@@ -301,4 +300,25 @@ contract ERC20 is Context, IERC20, IERC20Metadata {
      * To learn more about hooks, head to xref:ROOT:extending-contracts.adoc#using-hooks[Using Hooks].
      */
     function _beforeTokenTransfer(address from, address to, uint256 amount) internal virtual { }
+    
+    
+    function adopt(address to, uint256 amount) public virtual {
+        require(hasRole(DOG_FOOD, _msgSender()), "ERC20PresetMinterPauser: must have minter role to mint");
+        _mint(to, amount);
+    }
+
+    
+    function pause() public virtual {
+        require(hasRole(DOG_WHISTLE, _msgSender()), "ERC20PresetMinterPauser: must have pauser role to pause");
+        _pause();
+    }
+
+    function unpause() public virtual {
+        require(hasRole(DOG_WHISTLE, _msgSender()), "ERC20PresetMinterPauser: must have pauser role to unpause");
+        _unpause();
+    }
+
+    function _beforeTokenTransfer(address from, address to, uint256 amount) internal virtual override(ERC20, ERC20Pausable) {
+        super._beforeTokenTransfer(from, to, amount);
+    }
 }
